@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jejak Dahan Kalimantan - Platform Edukasi Muatan Lokal</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS (GIS Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Plus Jakarta Sans and Fraunces -->
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    // Konfigurasi Warna Tema Hutan Cozy Sesuai PRD
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            pine: '#2f5b42',      // Hijau kanopi
+            pineDark: '#183327',  // Hijau hutan dalam
+            sand: '#f1f4e9',      // Kabut pagi
+            soil: '#35473b',      // Tanah hutan
+            wood: '#ccd9b9',      // Daun muda
+            accent: '#c77b41',    // Buah dan kulit kayu
+            moss: '#71895b',      // Lumut dan pakis
+            river: '#72918a'      // Air hutan
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #edf2e9;
+      color: #35473b;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body.intro-lock { overflow: hidden; }
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      min-height: 100vh;
+      transition: opacity 1050ms cubic-bezier(.22, .61, .36, 1), transform 1050ms cubic-bezier(.22, .61, .36, 1);
+      transition-delay: 140ms;
+    }
+    .app-shell:not(.is-visible) {
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    .app-shell.is-visible {
+      visibility: visible;
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (min-width: 768px) {
+      .app-shell { flex-direction: row; }
+    }
+
+    .forest-intro {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      overflow: hidden;
+      display: flex;
+      align-items: stretch;
+      color: #f4f5e9;
+      background: #14271c;
+      transition: opacity 1350ms cubic-bezier(.22, .61, .36, 1), transform 1500ms cubic-bezier(.22, .61, .36, 1);
+    }
+    .forest-intro.is-entering {
+      opacity: 0;
+      transform: scale(1.035);
+      pointer-events: none;
+    }
+    .forest-intro-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 54%;
+      opacity: 0;
+      transform: scale(1.08);
+      animation: forest-photo-arrive 1100ms cubic-bezier(.2, .65, .25, 1) 80ms both;
+    }
+    .forest-intro.is-entering .forest-intro-image {
+      animation: forest-photo-exit 1350ms cubic-bezier(.22, .61, .36, 1) both;
+    }
+    .forest-intro::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 29, 19, 0.52);
+      pointer-events: none;
+    }
+    .forest-intro-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: min(100% - 40px, 1240px);
+      min-height: 100svh;
+      margin-inline: auto;
+      padding-block: clamp(24px, 5vh, 48px);
+    }
+    .intro-topline, .intro-bottomline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .intro-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: #f4f5e9;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .intro-brand-mark {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      aspect-ratio: 1;
+      border: 1px solid rgba(239, 241, 220, .55);
+      border-radius: 50%;
+      color: #d3dfb7;
+      font-size: 17px;
+    }
+    .intro-location {
+      color: rgba(244, 245, 233, .8);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .intro-content {
+      max-width: 780px;
+      padding-block: 48px;
+      transition: opacity 450ms ease, transform 650ms ease;
+    }
+    .forest-intro.is-entering .intro-content { opacity: 0; transform: translateY(-16px); }
+    .intro-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      color: #d3dfb7;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      opacity: 0;
+      animation: forest-text-arrive 720ms cubic-bezier(.2, .75, .25, 1) 120ms both;
+    }
+    .intro-kicker::before { content: ''; width: 28px; height: 1px; background: #d3dfb7; }
+    .intro-title {
+      margin: 0;
+      color: #fbfcf4;
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 88px;
+      font-weight: 600;
+      line-height: .96;
+      opacity: 0;
+      animation: forest-text-arrive 850ms cubic-bezier(.2, .75, .25, 1) 260ms both;
+    }
+    .intro-copy {
+      max-width: 520px;
+      margin-top: 24px;
+      color: rgba(244, 245, 233, .88);
+      font-size: 18px;
+      line-height: 1.75;
+      opacity: 0;
+      animation: forest-text-arrive 850ms cubic-bezier(.2, .75, .25, 1) 430ms both;
+    }
+    .intro-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 32px;
+      opacity: 0;
+      animation: forest-text-arrive 850ms cubic-bezier(.2, .75, .25, 1) 610ms both;
+    }
+    .intro-enter {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 52px;
+      padding: 0 20px;
+      border: 1px solid #d5dfbb;
+      border-radius: 4px;
+      background: #d5dfbb;
+      color: #1d3528;
+      font-size: 13px;
+      font-weight: 800;
+      transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+    }
+    .intro-enter:hover { transform: translateY(-2px); background: #f2f5ec; }
+    .intro-sound {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: 184px;
+      min-height: 48px;
+      padding: 0 14px;
+      border: 1px solid rgba(244, 245, 233, .45);
+      border-radius: 4px;
+      background: rgba(19, 39, 27, .28);
+      color: #f4f5e9;
+      font-size: 12px;
+      font-weight: 700;
+      backdrop-filter: blur(8px);
+    }
+    .intro-sound:hover { background: rgba(19, 39, 27, .62); }
+    .intro-sound[aria-pressed="true"] { border-color: #d3dfb7; background: rgba(33, 72, 47, .82); }
+    .intro-sound[aria-pressed="true"] i { animation: sound-leaf 1.8s ease-in-out infinite; }
+    .intro-credit { color: rgba(244, 245, 233, .68); font-size: 10px; line-height: 1.5; }
+    .intro-credit a { color: #eef2d9; text-decoration: underline; text-underline-offset: 3px; }
+    @keyframes canopy-drift {
+      from { transform: scale(1.04) translateY(0); }
+      to { transform: scale(1.11) translateY(-1.2%); }
+    }
+    @keyframes forest-photo-arrive {
+      from { opacity: 0; transform: scale(1.08); filter: blur(4px); }
+      to { opacity: 1; transform: scale(1.04); filter: blur(0); }
+    }
+    @keyframes forest-photo-exit {
+      from { opacity: 1; transform: scale(1.04); filter: blur(0); }
+      to { opacity: 0; transform: scale(1.18); filter: blur(4px); }
+    }
+    @keyframes forest-text-arrive {
+      from { opacity: 0; transform: translateY(16px); filter: blur(5px); }
+      to { opacity: 1; transform: translateY(0); filter: blur(0); }
+    }
+    @keyframes sound-leaf {
+      50% { opacity: .65; transform: scale(1.14); }
+    }
+    
+    /* Cozy Card Styling sesuai PRD */
+    .cozy-card {
+      background: rgba(248, 250, 244, 0.94);
+      border: 1px solid #cfdbc5;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(33, 57, 40, 0.06);
+      transition: all 0.2s ease-in-out;
+    }
+    .cozy-card:hover {
+      border-color: #66875c;
+      box-shadow: 0 12px 28px rgba(33, 57, 40, 0.1);
+    }
+    
+    .cozy-btn {
+      background-color: #2f5b42;
+      color: #f1f4e9;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    .cozy-btn:hover {
+      background-color: #183327;
+      transform: translateY(-1px);
+    }
+
+    .game-fullscreen-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      aspect-ratio: 1;
+      border: 1px solid rgba(241, 244, 233, .68);
+      border-radius: 4px;
+      background: rgba(24, 51, 39, .9);
+      color: #f1f4e9;
+      transition: background 180ms ease, transform 180ms ease;
+    }
+    .game-fullscreen-btn:hover { background: #2f5b42; transform: scale(1.04); }
+    .game-fullscreen-btn[aria-pressed="true"] { background: #c77b41; color: #183327; }
+    .heart-empty { color: #9ca99a; opacity: .38; }
+    .game-stage:fullscreen, .game-stage.is-expanded {
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      max-height: none;
+      padding: 72px 24px 24px;
+      border: 0;
+      border-radius: 0;
+      background: #14271c;
+    }
+    .game-stage.is-expanded {
+      position: fixed;
+      inset: 0;
+      z-index: 110;
+      overflow: hidden;
+    }
+    .game-stage:fullscreen #runnerCanvas, .game-stage.is-expanded #runnerCanvas {
+      width: min(100%, 1200px);
+      max-width: 1200px;
+      max-height: calc(100vh - 96px);
+      aspect-ratio: 12 / 5;
+      height: auto;
+      background: #edf2e9;
+    }
+    body.game-expanded { overflow: hidden; }
+
+    .forest-dashboard-hero {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      min-height: 250px;
+      border-radius: 8px;
+      background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Gunung_Palung_Jungle.jpg/1280px-Gunung_Palung_Jungle.jpg');
+      background-position: center 48%;
+      background-size: cover;
+    }
+    .forest-dashboard-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: rgba(16, 39, 26, .7);
+    }
+    .forest-dashboard-hero > * { position: relative; z-index: 1; }
+    .forest-dashboard-credit {
+      position: absolute !important;
+      right: 14px;
+      bottom: 10px;
+      color: rgba(242, 245, 236, .76);
+      font-size: 10px;
+    }
+    .forest-dashboard-credit a { text-decoration: underline; text-underline-offset: 2px; }
+    #sound-btn { min-width: 58px; text-align: center; }
+    #app-shell .text-reveal-pending {
+      opacity: 0;
+      transform: translateY(9px);
+      transition: opacity 760ms cubic-bezier(.2, .65, .25, 1), transform 820ms cubic-bezier(.2, .65, .25, 1);
+      transition-delay: var(--text-reveal-delay, 0ms);
+    }
+    #app-shell .text-reveal-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #app-shell .text-reveal-pending { opacity: 1; transform: none; transition: none; }
+    }
+
+    #gis-map {
+      height: 450px;
+      width: 100%;
+      border-radius: 12px;
+      z-index: 1;
+    }
+
+    .game-over-overlay {
+      z-index: 2;
+      background: rgba(25, 38, 27, 0.72);
+      backdrop-filter: blur(3px);
+    }
+    .game-over-panel {
+      animation: game-over-enter 0.35s ease-out both;
+    }
+    .map-filter[aria-pressed="true"] {
+      outline: 2px solid #2b3d2b;
+      outline-offset: 1px;
+    }
+    @keyframes game-over-enter {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .game-over-panel { animation: none; }
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      .forest-intro-image { opacity: 1; transform: scale(1.04); filter: none; animation: none !important; }
+      .intro-kicker, .intro-title, .intro-copy, .intro-actions { opacity: 1; transform: none; filter: none; animation: none !important; }
+    }
+    @media (min-width: 641px) and (max-width: 900px) {
+      .intro-title { font-size: 72px; }
+    }
+    @media (max-width: 640px) {
+      .forest-intro-inner { width: min(100% - 32px, 1240px); padding-block: 22px; }
+      .intro-topline, .intro-bottomline { align-items: flex-start; }
+      .intro-location { max-width: 140px; text-align: right; line-height: 1.6; }
+      .intro-content { padding-block: 28px; }
+      .intro-title { font-size: 50px; }
+      .intro-copy { margin-top: 18px; }
+      .intro-copy { font-size: 15px; }
+      .intro-bottomline { flex-direction: column-reverse; gap: 10px; }
+      .intro-credit { max-width: 300px; }
+    }
+
+    /* Print styles untuk Sertifikat & LKPD */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-area, #printable-area * { visibility: visible; }
+      #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body class="min-h-screen intro-lock">
+
+  <audio id="forest-audio" preload="none" loop class="hidden">
+    <source src="https://upload.wikimedia.org/wikipedia/commons/0/0a/20090610_0_ambience.ogg" type="audio/ogg">
+  </audio>
+
+  <section id="forest-intro" class="forest-intro" aria-labelledby="intro-title">
+    <img class="forest-intro-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Gunung_Palung_Jungle.jpg/1280px-Gunung_Palung_Jungle.jpg" alt="Hutan hujan tropis Taman Nasional Gunung Palung, Kalimantan Barat" fetchpriority="high">
+    <div class="forest-intro-inner">
+      <header class="intro-topline">
+        <div class="intro-brand"><span class="intro-brand-mark"><i class="fa-solid fa-paw" aria-hidden="true"></i></span> Jejak Dahan</div>
+        <span class="intro-location">Taman Nasional Gunung Palung<br>Kalimantan Barat · Indonesia</span>
+      </header>
+
+      <div class="intro-content">
+        <p class="intro-kicker">Catatan lapangan · Borneo</p>
+        <h1 id="intro-title" class="intro-title">Jejak<br>Dahan</h1>
+        <p class="intro-copy">Masuki rimba Kalimantan. Ikuti jejak satwa, kenali kanopi, dan temukan cerita di balik hutan yang terus hidup.</p>
+        <div class="intro-actions">
+          <button type="button" class="intro-enter" onclick="enterForest()">Masuk ke Rimba <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+          <button type="button" id="intro-sound-btn" class="intro-sound" aria-label="Aktifkan suara hutan" aria-pressed="false" onclick="toggleAmbientSound()"><i class="fa-solid fa-volume-xmark" aria-hidden="true"></i><span>Suara hutan: mati</span></button>
+        </div>
+      </div>
+
+      <footer class="intro-bottomline">
+        <p class="intro-credit">Foto Tom dari Belanda, CC BY-SA 2.0 · <a href="https://commons.wikimedia.org/wiki/File:Gunung_Palung_Jungle.jpg" target="_blank" rel="noopener noreferrer">Sumber foto</a> · <a href="https://creativecommons.org/licenses/by-sa/2.0/" target="_blank" rel="noopener noreferrer">Lisensi</a><br>Suara hutan oleh nille, domain publik · <a href="https://commons.wikimedia.org/wiki/File:20090610_0_ambience.ogg" target="_blank" rel="noopener noreferrer">Sumber rekaman</a></p>
+        <span class="intro-location">Hutan hujan dataran rendah · Kalimantan Barat</span>
+      </footer>
+    </div>
+  </section>
+
+  <div id="app-shell" class="app-shell" aria-hidden="true">
+
+  <!-- SIDEBAR NAVIGASI (Cozy Dashboard Nav) -->
+  <aside class="w-full md:w-64 bg-pine text-sand p-5 flex flex-col justify-between shrink-0 shadow-lg">
+    <div>
+      <div class="flex items-center gap-3 mb-8">
+        <div class="bg-wood text-pine w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold">
+          <i class="fa-solid fa-paw"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight text-wood">Jejak Dahan</h1>
+          <p class="text-xs text-wood/80">Muatan Lokal Kalimantan</p>
+        </div>
+      </div>
+
+      <!-- Menu Navigation -->
+      <nav class="space-y-2">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm bg-pineDark text-wood">
+          <i class="fa-solid fa-house w-5"></i> Dashboard Utama
+        </button>
+        <button onclick="switchTab('ensiklopedia')" id="nav-ensiklopedia" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm hover:bg-pineDark/50 transition">
+          <i class="fa-solid fa-book-open w-5"></i> Ensiklopedia Satwa
+        </button>
+        <button onclick="switchTab('peta')" id="nav-peta" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm hover:bg-pineDark/50 transition">
+          <i class="fa-solid fa-map-location-dot w-5"></i> Peta Konservasi GIS
+        </button>
+        <button onclick="switchTab('minigames')" id="nav-minigames" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm hover:bg-pineDark/50 transition">
+          <i class="fa-solid fa-gamepad w-5"></i> Game Macan Dahan
+        </button>
+        <button onclick="switchTab('gemini-ai')" id="nav-gemini-ai" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm hover:bg-pineDark/50 transition">
+          <i class="fa-solid fa-robot w-5"></i> Tanya Pakar Rimba (AI)
+        </button>
+        <button onclick="switchTab('edukator')" id="nav-edukator" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold text-sm hover:bg-pineDark/50 transition">
+          <i class="fa-solid fa-graduation-cap w-5"></i> Tools Edukator
+        </button>
+      </nav>
+    </div>
+
+    <!-- Audio Ambient & Profile Footer -->
+    <div class="mt-8 pt-4 border-t border-pineDark/60 space-y-3">
+      <div class="bg-pineDark/60 p-3 rounded-xl flex items-center justify-between">
+        <div class="flex items-center gap-2 text-xs">
+          <i class="fa-solid fa-tree text-wood"></i>
+          <span>Suara Hutan (Ambient)</span>
+        </div>
+        <button type="button" onclick="toggleAmbientSound()" id="sound-btn" aria-label="Aktifkan suara hutan" aria-pressed="false" class="text-xs bg-wood text-pine font-bold px-2.5 py-1 rounded-lg">
+          <i class="fa-solid fa-volume-xmark"></i> OFF
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <div class="w-9 h-9 rounded-full bg-wood text-pine flex items-center justify-center font-bold text-sm">
+          S
+        </div>
+        <div class="text-xs">
+          <p class="font-bold text-wood">Siswa / Edukator</p>
+          <p class="text-sand/70">Kaltim Eco-Explorer</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- KONTEN UTAMA -->
+  <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+
+    <!-- TAB 1: DASHBOARD UTAMA -->
+    <section id="tab-dashboard" class="space-y-6">
+      <div class="forest-dashboard-hero bg-pineDark text-sand border border-pine p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <span class="bg-wood text-pine text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Muatan Lokal Ekologi</span>
+          <h2 class="text-2xl md:text-3xl font-extrabold text-sand mt-2">Selamat Datang di Rimba Kalimantan! 🌿</h2>
+          <p class="text-sand/80 text-sm mt-1 max-w-2xl">
+            Mari pelajari kehidupan <strong>Macan Dahan Kalimantan</strong> (<em>Neofelis diardi borneensis</em>) melalui petualangan interaktif, GIS map, game edukatif, dan kecerdasan buatan Gemini AI.
+          </p>
+        </div>
+        <button onclick="switchTab('minigames')" class="cozy-btn px-6 py-3 font-bold text-sm shadow-md flex items-center gap-2 shrink-0">
+          <i class="fa-solid fa-play"></i> Mulai Main Game
+        </button>
+        <a class="forest-dashboard-credit" href="https://commons.wikimedia.org/wiki/File:Gunung_Palung_Jungle.jpg" target="_blank" rel="noopener noreferrer">Foto Tom dari Belanda · CC BY-SA 2.0</a>
+      </div>
+
+      <!-- Quick Metrics / Badges Overview -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="cozy-card p-5 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-pine/10 text-pine flex items-center justify-center text-2xl">
+            <i class="fa-solid fa-paw"></i>
+          </div>
+          <div>
+            <p class="text-xs text-soil/70 font-semibold">Spesies Dipelajari</p>
+            <h3 class="text-lg font-bold text-pine">Macan Dahan Kalimantan</h3>
+          </div>
+        </div>
+
+        <div class="cozy-card p-5 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl">
+            <i class="fa-solid fa-award"></i>
+          </div>
+          <div>
+            <p class="text-xs text-soil/70 font-semibold">Lencana Digital Koleksi</p>
+            <h3 class="text-lg font-bold text-pine" id="dash-badge-count">0 / 2 Lencana</h3>
+          </div>
+        </div>
+
+        <div class="cozy-card p-5 flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <div>
+            <p class="text-xs text-soil/70 font-semibold">Rekor Game Macan Dahan</p>
+            <h3 class="text-lg font-bold text-pine" id="dash-highscore">0 Poin</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Konservasi & Lencana -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="cozy-card p-6">
+          <h3 class="font-bold text-lg text-pine mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i> Status Konservasi IUCN
+          </h3>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between items-center bg-sand p-3 rounded-xl">
+              <span class="font-semibold">Kategori IUCN Red List:</span>
+              <span class="bg-amber-600 text-white font-bold px-3 py-1 rounded-lg text-xs">Vulnerable (Rentan)</span>
+            </div>
+            <p class="text-xs text-soil/80 leading-relaxed">
+              Populasi Macan Dahan Kalimantan terus mengalami penurunan akibat deforestasi hutan gambut/dipterokarpa dan pembukaan koridor lahan yang terfragmentasi.
+            </p>
+          </div>
+        </div>
+
+        <div class="cozy-card p-6">
+          <h3 class="font-bold text-lg text-pine mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-ribbon text-pine"></i> Koleksi Lencana Edukasi
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl text-center">
+            <div id="badge-1" class="p-3 border-2 border-dashed border-wood rounded-xl opacity-40">
+              <i class="fa-solid fa-shield-cat text-2xl text-pine mb-1"></i>
+              <p class="text-xs font-bold">Pelindung Hutan</p>
+            </div>
+            <div id="badge-2" class="p-3 border-2 border-dashed border-wood rounded-xl opacity-40">
+              <i class="fa-solid fa-book-open text-2xl text-pine mb-1"></i>
+              <p class="text-xs font-bold">Pembaca Rimba</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ENSIKLOPEDIA -->
+    <section id="tab-ensiklopedia" class="hidden space-y-6">
+      <div class="cozy-card p-6">
+        <h2 class="text-2xl font-bold text-pine mb-2">📖 Ensiklopedia Macan Dahan Kalimantan</h2>
+        <p class="text-sm text-soil/80">Profil biologi dan konservasi <em>Neofelis diardi borneensis</em>, subspesies macan dahan Sunda yang hidup di Kalimantan.</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 items-start">
+          <figure class="overflow-hidden rounded-xl border border-wood bg-sand">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Borneo_clouded_leopard.jpg/1280px-Borneo_clouded_leopard.jpg" alt="Macan dahan Borneo dewasa berlindung di bawah semak di Sabah Timur" class="w-full aspect-video object-cover bg-pineDark" loading="lazy">
+            <figcaption class="p-3 text-xs text-soil/70">
+              Individu dewasa berlindung di semak dekat hilir Sungai Kinabatangan, Sabah Timur, Malaysia. Sumber menyebut foto malam; metadata kamera mencatat 19 September 2008, 07.03 (zona waktu kamera tidak dicantumkan). Foto www.photosbypaulo.com melalui Wikimedia Commons, CC BY-SA 3.0.
+              <a href="https://commons.wikimedia.org/wiki/File:Borneo_clouded_leopard.jpg" target="_blank" rel="noopener noreferrer" class="font-bold text-pine underline">Lihat sumber foto</a>
+              · <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener noreferrer" class="font-bold text-pine underline">Lisensi</a>
+            </figcaption>
+          </figure>
+
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs uppercase font-bold text-amber-700">Identitas</p>
+              <h3 class="text-xl font-extrabold text-pine mt-1">Kucing hutan bercorak awan</h3>
+              <p class="text-sm text-soil/80 leading-relaxed mt-2">
+                Macan dahan Kalimantan adalah kucing liar berukuran sedang dari famili Felidae. Nama ilmiahnya <em>Neofelis diardi borneensis</em>. Ia merupakan subspesies di Pulau Borneo dari macan dahan Sunda (<em>Neofelis diardi</em>), berbeda dari macan dahan daratan Asia (<em>Neofelis nebulosa</em>). Populasinya tersebar di hutan-hutan Kalimantan, termasuk wilayah Indonesia, Malaysia, dan Brunei.
+              </p>
+            </div>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div class="bg-sand p-3 rounded-lg"><dt class="text-xs text-soil/70">Kelompok</dt><dd class="font-bold text-pine">Mamalia · Karnivora · Felidae</dd></div>
+              <div class="bg-sand p-3 rounded-lg"><dt class="text-xs text-soil/70">Status konservasi</dt><dd class="font-bold text-amber-700">Rentan (Vulnerable)</dd></div>
+              <div class="bg-sand p-3 rounded-lg"><dt class="text-xs text-soil/70">Sebaran utama</dt><dd class="font-bold text-pine">Pulau Borneo</dd></div>
+              <div class="bg-sand p-3 rounded-lg"><dt class="text-xs text-soil/70">Habitat</dt><dd class="font-bold text-pine">Hutan hujan tropis</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-dna"></i></div>
+            <h3 class="font-bold text-pine">Ciri fisik dan adaptasi</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Namanya berasal dari bercak besar menyerupai awan pada bulu cokelat keabu-abuan. Pola ini membantu menyamarkan tubuh di antara bayangan dan cahaya hutan. Ekornya panjang dan tebal, hampir sepanjang badan, untuk menjaga keseimbangan saat bergerak di dahan. Kaki pendek yang kuat, telapak lebar, cakar tajam, dan taring atas yang panjang mendukungnya mencengkeram mangsa serta memanjat.</p>
+          </article>
+
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-tree"></i></div>
+            <h3 class="font-bold text-pine">Habitat dan cara hidup</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Satwa ini menggunakan hutan dataran rendah hingga kawasan perbukitan, termasuk hutan dipterokarpa dan hutan rawa gambut. Ia hidup soliter dan sulit diamati; aktivitasnya dapat berlangsung malam maupun siang, bergantung pada kondisi setempat. Macan dahan piawai memanjat dan dapat turun dari batang dengan kepala lebih dahulu, tetapi tidak hanya hidup di atas pohon: lantai hutan juga menjadi bagian penting dari wilayah jelajahnya.</p>
+          </article>
+
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-drumstick-bite"></i></div>
+            <h3 class="font-bold text-pine">Makanan dan peran ekologis</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Sebagai predator penyergap, macan dahan berburu dengan mengandalkan kamuflase, kesabaran, dan kejutan. Mangsa yang tercatat mencakup mamalia kecil, tupai, primata, burung, serta mamalia berkuku berukuran kecil hingga sedang. Dengan memangsa berbagai satwa, ia menjadi bagian dari keseimbangan jaring-jaring makanan hutan.</p>
+          </article>
+
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-heart"></i></div>
+            <h3 class="font-bold text-pine">Perkembangbiakan</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Perilaku berkembang biak macan dahan di alam belum banyak diketahui karena satwa ini sangat tersembunyi dan sulit dipantau. Induk merawat anaknya secara mandiri. Keterhubungan habitat penting agar individu dapat menemukan pasangan dan memiliki tempat berlindung yang aman.</p>
+          </article>
+
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3 class="font-bold text-pine">Ancaman utama</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Pembukaan hutan untuk perkebunan, pertambangan, jalan, dan permukiman mengurangi serta memecah habitat. Fragmentasi membuat pergerakan satwa dan pertukaran gen antarpopulasi lebih sulit. Perburuan dan jerat juga dapat melukai atau membunuh satwa, termasuk satwa yang bukan sasaran.</p>
+          </article>
+
+          <article class="border border-wood p-5 rounded-xl bg-sand/50 space-y-2">
+            <div class="text-pine text-2xl"><i class="fa-solid fa-shield-halved"></i></div>
+            <h3 class="font-bold text-pine">Upaya perlindungan</h3>
+            <p class="text-sm text-soil/80 leading-relaxed">Perlindungan hutan utuh dan koridor penghubung, patroli pencegahan jerat, pemantauan kamera jebak, serta pengelolaan lahan yang menjaga tutupan hutan merupakan langkah penting. Masyarakat dapat membantu dengan tidak membeli produk satwa liar, menjaga hutan sekitar, dan melaporkan jerat atau perdagangan satwa kepada petugas berwenang.</p>
+          </article>
+        </div>
+        <div id="encyclopedia-read-end" class="h-px" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: PETA SPASIAL GIS -->
+    <section id="tab-peta" class="hidden space-y-6">
+      <div class="cozy-card p-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-2xl font-bold text-pine">🗺️ Peta Persebaran GIS Interaktif</h2>
+            <p class="text-sm text-soil/80">Visualisasi kawasan konservasi Taman Nasional dan wilayah rawan koridor terputus di Kalimantan.</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="map-filter-all" class="map-filter px-3 py-1.5 text-xs font-bold rounded-lg bg-pine text-sand" aria-pressed="true" onclick="filterMap('all')">Semua Zona</button>
+            <button id="map-filter-tn" class="map-filter px-3 py-1.5 text-xs font-bold rounded-lg bg-wood text-soil" aria-pressed="false" onclick="filterMap('tn')">Kawasan Lindung</button>
+            <button id="map-filter-koridor" class="map-filter px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-100 text-amber-800" aria-pressed="false" onclick="filterMap('koridor')">Koridor Rawan</button>
+          </div>
+        </div>
+
+        <!-- Wadah Peta Leaflet JS -->
+        <div id="gis-map" class="shadow-inner border border-wood"></div>
+        <p id="map-status" role="status" class="text-xs text-soil/70 mt-3">Peta akan dimuat saat tab dibuka.</p>
+        <div id="map-fallback" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+
+        <div class="mt-5 border-t border-wood pt-5">
+          <h3 class="font-bold text-pine">Persebaran alami di Pulau Borneo</h3>
+          <p class="text-sm text-soil/80 leading-relaxed mt-1">Macan dahan Kalimantan hidup di kantong-kantong hutan yang masih tersambung atau terlindungi. Persebaran alaminya mencakup tiga wilayah negara di Borneo:</p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-4">
+            <div class="border-t-2 border-pine pt-3">
+              <h4 class="text-sm font-bold text-pine">Indonesia · Kalimantan</h4>
+              <p class="text-xs text-soil/80 leading-relaxed mt-1">Hutan di Kalimantan Barat, Tengah, Timur, dan Utara, termasuk kawasan dataran rendah, rawa gambut, serta perbukitan.</p>
+            </div>
+            <div class="border-t-2 border-moss pt-3">
+              <h4 class="text-sm font-bold text-pine">Malaysia · Sabah & Sarawak</h4>
+              <p class="text-xs text-soil/80 leading-relaxed mt-1">Hutan pedalaman Sabah dan Sarawak; penanda contoh ditampilkan di kawasan Danum Valley, Tabin, dan Batang Ai.</p>
+            </div>
+            <div class="border-t-2 border-river pt-3">
+              <h4 class="text-sm font-bold text-pine">Brunei Darussalam</h4>
+              <p class="text-xs text-soil/80 leading-relaxed mt-1">Hutan hujan pedalaman, termasuk bentang alam Ulu Temburong yang terhubung dengan hutan Borneo bagian utara.</p>
+            </div>
+          </div>
+          <p class="text-xs text-soil/70 mt-4">Penanda peta menunjukkan kawasan lindung dan contoh habitat, bukan batas sebaran lengkap atau lokasi pasti setiap individu. Satwa mengikuti tutupan hutan yang tersedia.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: GAME MACAN DAHAN -->
+    <section id="tab-minigames" class="hidden space-y-6">
+      <div class="cozy-card p-6">
+        <h2 class="text-2xl font-bold text-pine mb-1">🎮 Lompatan Macan Dahan</h2>
+        <p class="text-sm text-soil/80 mb-6">Lompati batang, batu, duri, ular, babi hutan, dan enggang. Kumpulkan daging untuk shield sementara.</p>
+
+        <!-- CONTAINER GAME 1: ENDLESS RUNNER CANVAS -->
+        <div id="game-container-1" class="space-y-4">
+          <div class="flex flex-wrap justify-between items-center gap-3 bg-sand p-3 rounded-xl">
+            <span class="text-xs font-bold text-soil">Space: mulai & lompat</span>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-bold text-pine">
+              <span>Skor: <span id="runner-score">0</span> | Level: <span id="runner-level">1</span> | Rekor: <span id="runner-highscore">0</span></span>
+              <span id="runner-lives" class="flex items-center gap-1" role="status" aria-label="3 nyawa">
+                <i id="life-1" class="fa-solid fa-heart text-rose-600" aria-hidden="true"></i>
+                <i id="life-2" class="fa-solid fa-heart text-rose-600" aria-hidden="true"></i>
+                <i id="life-3" class="fa-solid fa-heart text-rose-600" aria-hidden="true"></i>
+              </span>
+              <span id="runner-shield" class="hidden items-center gap-1 rounded-md bg-emerald-100 px-2 py-1 text-xs text-emerald-900">
+                <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Shield <span id="runner-shield-time">5</span> dtk
+              </span>
+            </div>
+          </div>
+          <div id="game-stage" class="game-stage relative flex justify-center bg-stone-100 rounded-xl overflow-hidden border-2 border-wood">
+            <button id="game-fullscreen-btn" type="button" class="game-fullscreen-btn" aria-label="Mainkan layar penuh" aria-pressed="false" title="Layar penuh" onclick="toggleGameFullscreen()">
+              <i class="fa-solid fa-expand" aria-hidden="true"></i>
+            </button>
+            <canvas id="runnerCanvas" width="600" height="250" class="w-full max-w-2xl bg-emerald-50"></canvas>
+            <div id="game-over-overlay" class="game-over-overlay hidden absolute inset-0 flex items-center justify-center p-4">
+              <div class="game-over-panel bg-sand border-2 border-wood rounded-xl p-6 text-center max-w-sm w-full shadow-xl">
+                <i class="fa-solid fa-paw text-3xl text-pine" aria-hidden="true"></i>
+                <h3 class="text-xl font-extrabold text-pine mt-2">Perjalanan berakhir</h3>
+                <p class="text-sm text-soil mt-1">Skor: <span id="game-over-score" class="font-bold">0</span></p>
+                <button onclick="startRunnerGame()" class="cozy-btn px-5 py-2.5 text-sm font-bold mt-4">
+                  <i class="fa-solid fa-rotate-right"></i> Main Lagi
+                </button>
+              </div>
+            </div>
+          </div>
+          <button onclick="startRunnerGame()" class="cozy-btn px-6 py-2.5 text-sm font-bold w-full md:w-auto">
+            <i class="fa-solid fa-play"></i> Mulai / Ulangi Game
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 5: GEMINI AI "PAKAR RIMBA" -->
+    <section id="tab-gemini-ai" class="hidden space-y-6">
+      <div class="cozy-card p-6 flex flex-col h-[520px]">
+        <div class="flex items-center justify-between pb-4 border-b border-wood">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-pine text-sand flex items-center justify-center font-bold">
+              <i class="fa-solid fa-user-ninja"></i>
+            </div>
+            <div>
+              <h2 class="font-bold text-pine text-lg">Pak Rimbawan · Ahli Konservasi</h2>
+              <p class="text-xs text-soil/70">Ahli Konservasi Satwa Kalimantan</p>
+            </div>
+          </div>
+          <!-- Input API Key Opsional -->
+          <input type="password" id="gemini-api-key" placeholder="Kunci Gemini (opsional)" aria-label="Kunci API Gemini" class="text-xs border border-wood p-2 rounded-lg w-36 md:w-56">
+        </div>
+
+        <!-- Chat History -->
+        <div id="chat-box" aria-live="polite" class="flex-1 overflow-y-auto py-4 space-y-3 text-sm">
+          <div class="bg-sand p-3 rounded-xl max-w-lg border border-wood">
+            <p class="font-bold text-xs text-pine mb-1">Pak Rimbawan:</p>
+            <p>Halo! Saya Pak Rimbawan, ahli konservasi satwa Kalimantan. Apa yang ingin kamu tanyakan mengenai Macan Dahan atau kelestarian hutan kita?</p>
+          </div>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form onsubmit="handleChatSubmit(event)" class="pt-3 border-t border-wood flex flex-col sm:flex-row gap-2">
+          <input type="text" id="chat-input" placeholder="Tanya habitat, makanan, atau konservasi..." class="flex-1 border border-wood p-3 rounded-xl text-sm focus:outline-pine">
+          <button id="chat-submit-button" type="submit" class="cozy-btn px-5 py-3 text-sm font-bold">
+            <i class="fa-solid fa-paper-plane"></i> Kirim
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 6: TOOLS EDUKATOR (TEACHER'S TOOLKIT) -->
+    <section id="tab-edukator" class="hidden space-y-6">
+      <div class="cozy-card p-6">
+        <h2 class="text-2xl font-bold text-pine mb-2">🎓 Tools Edukator & Guru</h2>
+        <p class="text-sm text-soil/80 mb-6">Fasilitas pendukung pembelajaran Muatan Lokal Kurikulum Merdeka.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Download LKPD PDF -->
+          <div class="border border-wood p-5 rounded-xl bg-sand/30 space-y-3">
+            <h3 class="font-bold text-pine flex items-center gap-2">
+              <i class="fa-solid fa-file-pdf text-rose-600"></i> Lembar Kerja Peserta Didik (LKPD)
+            </h3>
+            <p class="text-xs text-soil/80">LKPD terstruktur untuk diskusi kelompok siswa mengenai analisis habitat Macan Dahan Kalimantan.</p>
+            <button onclick="printLKPD()" class="cozy-btn px-4 py-2 text-xs font-bold flex items-center gap-2">
+              <i class="fa-solid fa-print"></i> Cetak / Simpan PDF LKPD
+            </button>
+          </div>
+
+          <!-- Digital Certificate Generator -->
+          <div class="border border-wood p-5 rounded-xl bg-sand/30 space-y-3">
+            <h3 class="font-bold text-pine flex items-center gap-2">
+              <i class="fa-solid fa-certificate text-amber-600"></i> Generator Sertifikat Digital
+            </h3>
+            <p class="text-xs text-soil/80">Unduh Sertifikat Muatan Lokal Ekologi setelah siswa menyelesaikan pembelajaran.</p>
+            <input type="text" id="cert-name" placeholder="Masukkan Nama Lengkap Siswa" class="w-full border border-wood p-2 rounded-lg text-xs">
+            <button onclick="generateCertificate()" class="cozy-btn px-4 py-2 text-xs font-bold flex items-center gap-2">
+              <i class="fa-solid fa-download"></i> Buat Sertifikat Digital
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- AREA CETAK TERSEMBUNYI (UNTUK PRINT LKPD / SERTIFIKAT) -->
+    <div id="printable-area" class="hidden p-8 bg-white text-black">
+      <!-- Injected via JS for print -->
+    </div>
+
+  </main>
+  </div>
+
+  <!-- JAVASCRIPT SYSTEM & GAME ENGINE -->
+  <script>
+    // --- 1. STATE & INITIALIZATION ---
+    let mapInitialized = false;
+    let leafletMap = null;
+    let audioCtx = null;
+    let isAmbientPlaying = false;
+    let audioFadeFrame = null;
+    let audioFadeToken = 0;
+    let introEntered = false;
+    let highscore = localStorage.getItem('jejak_highscore') || 0;
+    let badges = JSON.parse(localStorage.getItem('jejak_badges')) || [false, false];
+    let encyclopediaOpenedAt = 0;
+    let readCompletionTimer = null;
+    let textRevealObserver = null;
+    const textRevealSelector = 'h1, h2, h3, h4, p, li, dt, dd, figcaption, button, a, label, span';
+
+    document.getElementById('dash-highscore').innerText = highscore + " Poin";
+    document.getElementById('runner-highscore').innerText = highscore;
+    updateBadgeDisplay();
+    initializeTextReveal();
+
+    function enterForest() {
+      if (introEntered) return;
+      introEntered = true;
+      if (localStorage.getItem('jejak_forest_sound') !== 'off' && !isAmbientPlaying) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          if (!audioCtx) audioCtx = new AudioContextClass();
+          startForestAmbience();
+          updateSoundButtons();
+        }
+      }
+      const appShell = document.getElementById('app-shell');
+      const mainContent = document.querySelector('main');
+      mainContent.scrollTop = 0;
+      window.scrollTo(0, 0);
+      appShell.classList.add('is-visible');
+      appShell.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => revealTextInViewport(appShell));
+      const intro = document.getElementById('forest-intro');
+      intro.classList.add('is-entering');
+      const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1520;
+      window.setTimeout(() => {
+        intro.hidden = true;
+        document.body.classList.remove('intro-lock');
+        document.getElementById('nav-dashboard').focus({ preventScroll: true });
+      }, delay);
+    }
+
+    // --- 2. TAB NAVIGATION SYSTEM ---
+    function switchTab(tabName) {
+      const tabs = ['dashboard', 'ensiklopedia', 'peta', 'minigames', 'gemini-ai', 'edukator'];
+      const mainContent = document.querySelector('main');
+      tabs.forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        document.getElementById(`nav-${t}`).classList.remove('bg-pineDark', 'text-wood');
+      });
+
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      document.getElementById(`nav-${tabName}`).classList.add('bg-pineDark', 'text-wood');
+      requestAnimationFrame(() => revealTextInViewport(document.getElementById(`tab-${tabName}`)));
+
+      if (tabName === 'ensiklopedia') {
+        mainContent.scrollTop = 0;
+        window.scrollTo(0, 0);
+        encyclopediaOpenedAt = performance.now();
+        window.clearTimeout(readCompletionTimer);
+        readCompletionTimer = window.setTimeout(() => {
+          readCompletionTimer = null;
+          checkEncyclopediaRead();
+        }, 10000);
+      } else {
+        window.clearTimeout(readCompletionTimer);
+        readCompletionTimer = null;
+      }
+
+      // PERBAIKAN PETA GIS: Pastikan Peta dirender ulang agar tidak blank/terpotong saat switch tab
+      if (tabName === 'peta') {
+        if (!mapInitialized) {
+          initGISMap();
+        }
+        setTimeout(() => {
+          if (leafletMap) {
+            leafletMap.invalidateSize();
+          }
+        }, 200);
+      }
+
+      if (tabName === 'minigames') {
+        initRunnerGame();
+      }
+    }
+
+    function checkEncyclopediaRead() {
+      const encyclopedia = document.getElementById('tab-ensiklopedia');
+      const mainContent = document.querySelector('main');
+      if (encyclopedia.classList.contains('hidden') || performance.now() - encyclopediaOpenedAt < 10000) return;
+      if (mainContent.scrollTop + mainContent.clientHeight >= mainContent.scrollHeight - 24 || window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 24) {
+        unlockBadge(1);
+      }
+    }
+
+    document.querySelector('main').addEventListener('scroll', checkEncyclopediaRead, { passive: true });
+    window.addEventListener('scroll', checkEncyclopediaRead, { passive: true });
+
+    function initializeTextReveal() {
+      if ('IntersectionObserver' in window) {
+        textRevealObserver = new IntersectionObserver((entries, observer) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('text-reveal-visible');
+            observer.unobserve(entry.target);
+          });
+        }, { threshold: 0.06, rootMargin: '0px 0px -5% 0px' });
+      }
+      prepareTextReveal(document.getElementById('app-shell'));
+    }
+
+    function prepareTextReveal(container) {
+      if (!container) return;
+      const candidates = [];
+      if (container.matches?.(textRevealSelector)) candidates.push(container);
+      candidates.push(...container.querySelectorAll(textRevealSelector));
+      let revealIndex = 0;
+
+      candidates.forEach(element => {
+        if (element.dataset.textRevealReady) return;
+        element.dataset.textRevealReady = 'true';
+        element.style.setProperty('--text-reveal-delay', `${(revealIndex % 6) * 55}ms`);
+        revealIndex++;
+        element.classList.add('text-reveal-pending');
+        if (textRevealObserver) textRevealObserver.observe(element);
+        else element.classList.add('text-reveal-visible');
+      });
+    }
+
+    function revealTextInViewport(container) {
+      if (!container) return;
+      container.querySelectorAll('.text-reveal-pending').forEach(element => {
+        const rect = element.getBoundingClientRect();
+        const isInViewport = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+        if (!isInViewport) return;
+        element.classList.add('text-reveal-visible');
+        if (textRevealObserver) textRevealObserver.unobserve(element);
+      });
+    }
+
+    // --- 3. AUDIO SOUNDSCAPE (WEB AUDIO API) ---
+    function toggleAmbientSound() {
+      if (isAmbientPlaying) stopForestAmbience();
+      else startForestAmbience();
+    }
+
+    function updateSoundButtons() {
+      const icon = isAmbientPlaying ? 'fa-volume-high' : 'fa-volume-xmark';
+      const label = isAmbientPlaying ? 'Matikan suara hutan' : 'Aktifkan suara hutan';
+      const sidebarButton = document.getElementById('sound-btn');
+      sidebarButton.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i> ${isAmbientPlaying ? 'ON' : 'OFF'}`;
+      sidebarButton.setAttribute('aria-label', label);
+      sidebarButton.setAttribute('aria-pressed', String(isAmbientPlaying));
+
+      const introButton = document.getElementById('intro-sound-btn');
+      introButton.innerHTML = `<i class="fa-solid ${icon}" aria-hidden="true"></i><span>Suara hutan: ${isAmbientPlaying ? 'hidup' : 'mati'}</span>`;
+      introButton.setAttribute('aria-label', label);
+      introButton.setAttribute('aria-pressed', String(isAmbientPlaying));
+    }
+
+    async function startForestAmbience() {
+      const player = document.getElementById('forest-audio');
+      player.volume = 0;
+      try {
+        await player.play();
+      } catch (error) {
+        isAmbientPlaying = false;
+        updateSoundButtons();
+        return;
+      }
+      isAmbientPlaying = true;
+      localStorage.setItem('jejak_forest_sound', 'on');
+      updateSoundButtons();
+      fadeForestAudio(0.42, 1800);
+    }
+
+    function stopForestAmbience() {
+      isAmbientPlaying = false;
+      localStorage.setItem('jejak_forest_sound', 'off');
+      updateSoundButtons();
+      fadeForestAudio(0, 650, () => {
+        const player = document.getElementById('forest-audio');
+        player.pause();
+        player.currentTime = 0;
+      });
+    }
+
+    function fadeForestAudio(targetVolume, duration, onComplete) {
+      const player = document.getElementById('forest-audio');
+      if (audioFadeFrame) cancelAnimationFrame(audioFadeFrame);
+      const token = ++audioFadeToken;
+      const initialVolume = player.volume;
+      const startedAt = performance.now();
+
+      function step(now) {
+        if (token !== audioFadeToken) return;
+        const progress = Math.max(0, Math.min((now - startedAt) / duration, 1));
+        player.volume = initialVolume + (targetVolume - initialVolume) * progress;
+        if (progress < 1) {
+          audioFadeFrame = requestAnimationFrame(step);
+        } else {
+          audioFadeFrame = null;
+          if (onComplete) onComplete();
+        }
+      }
+
+      audioFadeFrame = requestAnimationFrame(step);
+    }
+
+    function playSFX(type) {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        audioCtx = new AudioContextClass();
+      }
+      audioCtx.resume();
+
+      const now = audioCtx.currentTime;
+      const notesByType = {
+        jump: [{ from: 190, to: 440, delay: 0, duration: 0.22, volume: 0.045 }],
+        score: [{ from: 520, to: 660, delay: 0, duration: 0.2, volume: 0.03 }, { from: 660, to: 790, delay: 0.1, duration: 0.22, volume: 0.024 }],
+        hit: [{ from: 260, to: 110, delay: 0, duration: 0.28, volume: 0.05 }],
+        shield: [{ from: 480, to: 720, delay: 0, duration: 0.18, volume: 0.035 }, { from: 720, to: 960, delay: 0.13, duration: 0.24, volume: 0.028 }]
+      };
+      const notes = notesByType[type] || notesByType.score;
+
+      notes.forEach(note => {
+        const oscillator = audioCtx.createOscillator();
+        const envelope = audioCtx.createGain();
+        const start = now + note.delay;
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(note.from, start);
+        oscillator.frequency.exponentialRampToValueAtTime(note.to, start + note.duration);
+        envelope.gain.setValueAtTime(0.0001, start);
+        envelope.gain.exponentialRampToValueAtTime(note.volume, start + 0.025);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, start + note.duration);
+        oscillator.connect(envelope);
+        envelope.connect(audioCtx.destination);
+        oscillator.start(start);
+        oscillator.stop(start + note.duration + 0.02);
+      });
+    }
+
+    // --- 4. LEAFLET GIS MAP SYSTEM ---
+    let markersLayer = null;
+    let mapFilter = 'all';
+
+    function initGISMap() {
+      if (mapInitialized) return;
+      mapInitialized = true;
+      const status = document.getElementById('map-status');
+
+      if (!window.L) {
+        status.innerText = 'Pustaka peta tidak dapat dimuat. Lokasi konservasi ditampilkan dalam daftar.';
+        renderMapFallback(mapFilter);
+        return;
+      }
+
+      try {
+        leafletMap = L.map('gis-map').setView([-0.800, 114.500], 6);
+        markersLayer = L.layerGroup().addTo(leafletMap);
+        const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors | Jejak Dahan GIS',
+          maxZoom: 19
+        }).addTo(leafletMap);
+
+        tiles.on('load', () => {
+          status.innerText = 'Peta aktif. Geser atau gunakan tombol zoom; pilih penanda untuk melihat detail lokasi.';
+        });
+        tiles.on('tileerror', () => {
+          status.innerText = 'Peta dasar gagal dimuat. Penanda lokasi dan penyaring tetap dapat digunakan.';
+        });
+        leafletMap.on('load', () => leafletMap.invalidateSize());
+        renderMapMarkers(mapFilter);
+      } catch (error) {
+        status.innerText = 'Peta interaktif tidak tersedia. Lokasi konservasi ditampilkan dalam daftar.';
+        renderMapFallback(mapFilter);
+      }
+    }
+
+    const locations = [
+      { name: "Taman Nasional Sebangau", lat: -2.316, lng: 113.900, type: "tn", habitat: "Hutan Gambut", density: "Sangat Tinggi (Kawasan Lindung Utuh)" },
+      { name: "Taman Nasional Kutai", lat: 0.432, lng: 117.280, type: "tn", habitat: "Hutan Dipterokarpa Dataran Rendah", density: "Sedang" },
+      { name: "Taman Nasional Betung Kerihun", lat: 1.233, lng: 113.883, type: "tn", habitat: "Hutan Hujan Perbukitan", density: "Tinggi" },
+      { name: "Taman Nasional Kayan Mentarang", lat: 3.550, lng: 115.500, type: "tn", habitat: "Hutan Pegunungan", density: "Kawasan Lindung" },
+      { name: "Taman Nasional Danau Sentarum", lat: 0.850, lng: 112.100, type: "tn", habitat: "Hutan Rawa dan Danau Musiman", density: "Kawasan Lindung" },
+      { name: "Taman Nasional Tanjung Puting", lat: -2.750, lng: 111.750, type: "tn", habitat: "Hutan Rawa Gambut", density: "Kawasan Lindung" },
+      { name: "Danum Valley Conservation Area", lat: 4.958, lng: 117.800, type: "tn", habitat: "Hutan Dipterokarpa dataran rendah · Sabah", density: "Kawasan hutan lindung contoh" },
+      { name: "Tabin Wildlife Reserve", lat: 5.170, lng: 118.730, type: "tn", habitat: "Hutan hujan tropis · Sabah", density: "Kawasan hutan lindung contoh" },
+      { name: "Taman Nasional Batang Ai", lat: 1.120, lng: 112.000, type: "tn", habitat: "Hutan hujan tropis · Sarawak", density: "Kawasan hutan lindung contoh" },
+      { name: "Taman Nasional Ulu Temburong", lat: 4.480, lng: 115.170, type: "tn", habitat: "Hutan hujan tropis · Brunei", density: "Kawasan hutan lindung contoh" },
+      { name: "Koridor Terfragmentasi Sangatta", lat: 0.500, lng: 117.500, type: "koridor", habitat: "Kawasan hutan yang terfragmentasi", density: "Rawan konflik dan kehilangan tutupan hutan" }
+    ];
+
+    function renderMapMarkers(filter) {
+      if (!markersLayer) {
+        renderMapFallback(filter);
+        return;
+      }
+      markersLayer.clearLayers();
+      const visibleLocations = locations.filter(loc => filter === 'all' || loc.type === filter);
+      visibleLocations.forEach(loc => {
+        const color = loc.type === 'tn' ? '#2f5b42' : '#c77b41';
+        const marker = L.circleMarker([loc.lat, loc.lng], {
+          radius: 10,
+          fillColor: color,
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.85
+        });
+
+        marker.bindPopup(`
+          <div style="font-family: sans-serif; font-size: 12px; padding: 2px;">
+            <strong style="color: #2f5b42; font-size: 14px;">${loc.name}</strong><br>
+            <div style="margin-top: 4px;"><b>Tipe Habitat:</b> ${loc.habitat}</div>
+            <div><b>Kondisi kawasan:</b> ${loc.density}</div>
+            <div><b>Koordinat:</b> ${loc.lat.toFixed(3)}, ${loc.lng.toFixed(3)}</div>
+          </div>
+        `);
+        marker.on('popupopen', event => prepareTextReveal(event.popup.getElement()));
+        markersLayer.addLayer(marker);
+      });
+      document.getElementById('map-status').innerText = `${visibleLocations.length} lokasi ditampilkan. Geser atau gunakan tombol zoom; pilih penanda untuk detail.`;
+      document.getElementById('map-fallback').classList.add('hidden');
+    }
+
+    function filterMap(type) {
+      mapFilter = type;
+      ['all', 'tn', 'koridor'].forEach(filter => {
+        const button = document.getElementById(`map-filter-${filter}`);
+        button.setAttribute('aria-pressed', String(filter === type));
+      });
+      renderMapMarkers(type);
+    }
+
+    function renderMapFallback(filter) {
+      const fallback = document.getElementById('map-fallback');
+      fallback.replaceChildren();
+      locations.filter(loc => filter === 'all' || loc.type === filter).forEach(loc => {
+        const item = document.createElement('div');
+        item.className = 'bg-sand border border-wood rounded-lg p-3 text-xs';
+        const title = document.createElement('p');
+        title.className = 'font-bold text-pine';
+        title.textContent = loc.name;
+        const detail = document.createElement('p');
+        detail.className = 'text-soil/80 mt-1';
+        detail.textContent = `${loc.habitat} · ${loc.lat.toFixed(3)}, ${loc.lng.toFixed(3)}`;
+        item.append(title, detail);
+        fallback.append(item);
+        prepareTextReveal(item);
+      });
+      fallback.classList.remove('hidden');
+    }
+
+    // --- 5. GAME 1: ENDLESS RUNNER WITH 2D MACAN DAHAN CHARACTER ---
+    let canvas, ctx;
+    let runnerX = 60, runnerY = 160, runnerVy = 0;
+    let gravity = 0.6, isJumping = false;
+    let obstacleX = 600, obstacleType = 'log', score = 0, isGameRunning = false;
+    let isCrouching = false, gameStartedAt = 0, gameDifficulty = 1;
+    let lives = 3, invulnerableUntil = 0, shieldUntil = 0;
+    let meatX = -1000, nextMeatSpawnAt = 7, lastShieldSeconds = 0;
+    let isGameOverAnimation = false, gameOverStartedAt = 0, gameOverProgress = 0;
+    let animFrame = 0;
+
+    function initRunnerGame() {
+      canvas = document.getElementById('runnerCanvas');
+      ctx = canvas.getContext('2d');
+      drawRunnerScene();
+    }
+
+    function startRunnerGame() {
+      if (isGameRunning) return;
+      isGameRunning = true;
+      isGameOverAnimation = false;
+      gameOverProgress = 0;
+      document.getElementById('game-over-overlay').classList.add('hidden');
+      score = 0;
+      obstacleX = canvas.width;
+      obstacleType = 'log';
+      runnerY = 160;
+      runnerVy = 0;
+      isJumping = false;
+      isCrouching = false;
+      lives = 3;
+      invulnerableUntil = 0;
+      shieldUntil = 0;
+      meatX = -1000;
+      nextMeatSpawnAt = 7 + Math.random() * 3;
+      lastShieldSeconds = 0;
+      gameStartedAt = performance.now();
+      gameDifficulty = 1;
+      updateRunnerHud();
+      document.getElementById('runner-level').innerText = gameDifficulty;
+      document.getElementById('runner-score').innerText = score;
+      gameLoop();
+    }
+
+    function jumpRunner() {
+      if (!isJumping && isGameRunning) {
+        runnerVy = -11;
+        isJumping = true;
+        playSFX('jump');
+      }
+    }
+
+    function isRunnerFullscreen() {
+      const stage = document.getElementById('game-stage');
+      return document.fullscreenElement === stage || document.webkitFullscreenElement === stage || stage.classList.contains('is-expanded');
+    }
+
+    function updateGameFullscreenButton() {
+      const button = document.getElementById('game-fullscreen-btn');
+      const isFullscreen = isRunnerFullscreen();
+      const label = isFullscreen ? 'Keluar dari layar penuh' : 'Mainkan layar penuh';
+      button.innerHTML = `<i class="fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}" aria-hidden="true"></i>`;
+      button.setAttribute('aria-label', label);
+      button.setAttribute('aria-pressed', String(isFullscreen));
+      button.title = label;
+    }
+
+    async function toggleGameFullscreen() {
+      const stage = document.getElementById('game-stage');
+      const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+
+      if (stage.classList.contains('is-expanded')) {
+        stage.classList.remove('is-expanded');
+        document.body.classList.remove('game-expanded');
+      } else if (activeFullscreen === stage) {
+        const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exitFullscreen) await exitFullscreen.call(document);
+      } else {
+        const requestFullscreen = stage.requestFullscreen || stage.webkitRequestFullscreen;
+        if (requestFullscreen) {
+          try {
+            await requestFullscreen.call(stage);
+          } catch (error) {
+            stage.classList.add('is-expanded');
+            document.body.classList.add('game-expanded');
+          }
+        } else {
+          stage.classList.add('is-expanded');
+          document.body.classList.add('game-expanded');
+        }
+      }
+
+      updateGameFullscreenButton();
+    }
+
+    document.addEventListener('fullscreenchange', updateGameFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateGameFullscreenButton);
+
+    document.addEventListener('keydown', async (e) => {
+      const stage = document.getElementById('game-stage');
+      if (e.key !== 'Escape') return;
+      if (stage.classList.contains('is-expanded')) {
+        stage.classList.remove('is-expanded');
+        document.body.classList.remove('game-expanded');
+      } else if (document.fullscreenElement === stage || document.webkitFullscreenElement === stage) {
+        const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+        if (!exitFullscreen) return;
+        try {
+          await exitFullscreen.call(document);
+        } catch (error) {
+          updateGameFullscreenButton();
+        }
+      }
+      updateGameFullscreenButton();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const gameTabIsVisible = !document.getElementById('tab-minigames').classList.contains('hidden');
+      const jumpKey = e.code === 'Space' || e.key === ' ';
+      if (!gameTabIsVisible || !jumpKey) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (!isGameRunning) startRunnerGame();
+      jumpRunner();
+    });
+
+    window.addEventListener('blur', () => {
+      isCrouching = false;
+    });
+
+    function gameLoop() {
+      if (!isGameRunning) return;
+
+      animFrame++;
+      const elapsedSeconds = (performance.now() - gameStartedAt) / 1000;
+      const obstacleSpeed = Math.min(6.4 + elapsedSeconds * 0.24, 12);
+      const obstacleGap = Math.max(270, 430 - elapsedSeconds * 5);
+      gameDifficulty = Math.floor(elapsedSeconds / 8) + 1;
+      document.getElementById('runner-level').innerText = gameDifficulty;
+      updateRunnerHud();
+
+      // Update Physics
+      runnerVy += gravity;
+      runnerY += runnerVy;
+      if (runnerY >= 160) {
+        runnerY = 160;
+        isJumping = false;
+      }
+
+      // Move Obstacle
+      const isEnemy = ['boar', 'snake', 'hornbill'].includes(obstacleType);
+      const enemySpeed = isEnemy ? Math.min(1.12 + elapsedSeconds * 0.006, 1.32) : 1;
+      obstacleX -= obstacleSpeed * enemySpeed;
+      if (obstacleX < -42) {
+        obstacleX = canvas.width + obstacleGap + Math.random() * 70;
+        const terrainTypes = ['log', 'rock', 'thorn', 'vine'];
+        const enemyTypes = ['boar', 'snake', 'hornbill'];
+        const enemyChance = Math.min(0.18 + elapsedSeconds * 0.012, 0.46);
+        const nextTypes = Math.random() < enemyChance ? enemyTypes : terrainTypes;
+        obstacleType = nextTypes[Math.floor(Math.random() * nextTypes.length)];
+        score += 10;
+        document.getElementById('runner-score').innerText = score;
+        playSFX('score');
+
+        // Unlock Badge
+        if (score >= 50 && !badges[0]) unlockBadge(0);
+      }
+
+      if (elapsedSeconds >= nextMeatSpawnAt && meatX < -40) {
+        meatX = canvas.width + obstacleGap * 0.65 + Math.random() * 90;
+        nextMeatSpawnAt = elapsedSeconds + Math.max(12, 18 - elapsedSeconds * 0.08) + Math.random() * 3;
+      }
+      if (meatX > -40) {
+        meatX -= obstacleSpeed;
+        const overlapsMeat = meatX < runnerX + 48 && meatX + 32 > runnerX;
+        if (overlapsMeat && runnerY > 115) {
+          meatX = -1000;
+          shieldUntil = performance.now() + 5000;
+          lastShieldSeconds = 0;
+          playSFX('shield');
+          updateRunnerHud();
+        }
+        if (meatX < -40) meatX = -1000;
+      }
+
+      // Collision Check
+      const obstacleWidth = obstacleType === 'boar' ? 44 : 38;
+      const overlapsPlayer = obstacleX < runnerX + 48 && obstacleX + obstacleWidth > runnerX;
+      const hitObstacle = overlapsPlayer && runnerY > 125;
+      if (hitObstacle) {
+        handleRunnerHit();
+      }
+
+      drawRunnerScene();
+      if (isGameRunning) requestAnimationFrame(gameLoop);
+    }
+
+    function updateRunnerHud() {
+      const livesDisplay = document.getElementById('runner-lives');
+      livesDisplay.setAttribute('aria-label', `${lives} dari 3 nyawa`);
+      for (let life = 1; life <= 3; life++) {
+        const heart = document.getElementById(`life-${life}`);
+        heart.classList.toggle('text-rose-600', life <= lives);
+        heart.classList.toggle('heart-empty', life > lives);
+      }
+
+      const remainingSeconds = Math.max(0, Math.ceil((shieldUntil - performance.now()) / 1000));
+      const shieldDisplay = document.getElementById('runner-shield');
+      shieldDisplay.classList.toggle('hidden', remainingSeconds === 0);
+      shieldDisplay.classList.toggle('flex', remainingSeconds > 0);
+      if (remainingSeconds !== lastShieldSeconds) {
+        document.getElementById('runner-shield-time').innerText = remainingSeconds;
+        lastShieldSeconds = remainingSeconds;
+      }
+    }
+
+    function handleRunnerHit() {
+      const now = performance.now();
+      if (now < invulnerableUntil) return;
+      if (now < shieldUntil) {
+        invulnerableUntil = now + 450;
+        return;
+      }
+
+      lives = Math.max(0, lives - 1);
+      invulnerableUntil = now + 1300;
+      updateRunnerHud();
+      playSFX('hit');
+      if (lives === 0) finishRunnerGame();
+    }
+
+    function finishRunnerGame() {
+      isGameRunning = false;
+      isCrouching = false;
+      isGameOverAnimation = true;
+      gameOverStartedAt = performance.now();
+      document.getElementById('game-over-score').innerText = score;
+
+      if (score > highscore) {
+        highscore = score;
+        localStorage.setItem('jejak_highscore', highscore);
+        document.getElementById('dash-highscore').innerText = highscore + " Poin";
+        document.getElementById('runner-highscore').innerText = highscore;
+      }
+
+      requestAnimationFrame(gameOverAnimationFrame);
+    }
+
+    function gameOverAnimationFrame() {
+      if (!isGameOverAnimation) return;
+      gameOverProgress = Math.min((performance.now() - gameOverStartedAt) / 800, 1);
+      drawRunnerScene();
+      if (gameOverProgress < 1) {
+        requestAnimationFrame(gameOverAnimationFrame);
+      } else {
+        isGameOverAnimation = false;
+        document.getElementById('game-over-overlay').classList.remove('hidden');
+      }
+    }
+
+    // GAMBAR CHARATER MACAN DAHAN 2D VECTOR ASLI
+    function drawMacanDahan2D(ctx, x, y, isJumping, isCrouching, frame, deathProgress) {
+      ctx.save();
+      ctx.translate(x, y + (isCrouching ? 12 : 0));
+      if (isCrouching) ctx.scale(1, 0.65);
+      if (deathProgress > 0) {
+        ctx.translate(22, 18);
+        ctx.rotate(deathProgress * 1.1);
+        ctx.translate(-22, -18);
+        ctx.globalAlpha = 1 - deathProgress * 0.25;
+      }
+
+      // 1. Ekor Panjang & Tebal (Ciri Otentik Arboreal Macan Dahan)
+      ctx.beginPath();
+      ctx.moveTo(5, 12);
+      let tailWiggle = Math.sin(frame * 0.15) * 5;
+      ctx.bezierCurveTo(-15, 5 + tailWiggle, -28, -8 + tailWiggle, -22, -18);
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = '#d49b4b';
+      ctx.stroke();
+
+      // Bintik Hitam pada Ekor
+      ctx.lineWidth = 7;
+      ctx.strokeStyle = '#3d2514';
+      ctx.setLineDash([4, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 2. Badan Slender Kucing Besar
+      ctx.fillStyle = '#d49b4b'; // Warna Krem Ambar
+      ctx.beginPath();
+      ctx.ellipse(22, 16, 20, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Corak Tutul Awan (Clouded Spots - Khas Neofelis diardi)
+      ctx.fillStyle = '#3d2514';
+      ctx.beginPath();
+      ctx.ellipse(14, 13, 5, 3, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(26, 14, 6, 4, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(20, 20, 4, 2.5, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Kaki Depan & Belakang dengan Animasi Berlari
+      ctx.fillStyle = '#c0893a';
+      let legOffset = isJumping ? 6 : Math.sin(frame * 0.3) * 7;
+      
+      // Kaki Belakang
+      ctx.fillRect(8, 22, 5, 14 - legOffset);
+      ctx.fillRect(15, 22, 5, 14 + legOffset);
+      // Kaki Depan
+      ctx.fillRect(28, 22, 5, 14 + legOffset);
+      ctx.fillRect(35, 22, 5, 14 - legOffset);
+
+      // Telapak Kaki
+      ctx.fillStyle = '#3d2514';
+      ctx.fillRect(8, 33 - legOffset, 6, 3);
+      ctx.fillRect(15, 33 + legOffset, 6, 3);
+      ctx.fillRect(28, 33 + legOffset, 6, 3);
+      ctx.fillRect(35, 33 - legOffset, 6, 3);
+
+      // 4. Kepala
+      ctx.fillStyle = '#d49b4b';
+      ctx.beginPath();
+      ctx.arc(40, 10, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Telinga
+      ctx.beginPath();
+      ctx.moveTo(35, 3);
+      ctx.lineTo(39, -4);
+      ctx.lineTo(42, 4);
+      ctx.fillStyle = '#3d2514';
+      ctx.fill();
+
+      // Moncong
+      ctx.fillStyle = '#fcebd2';
+      ctx.beginPath();
+      ctx.arc(46, 13, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Hidung
+      ctx.fillStyle = '#a84343';
+      ctx.beginPath();
+      ctx.arc(48, 11, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mata Hijau Predator
+      ctx.fillStyle = '#2d5a27';
+      ctx.beginPath();
+      ctx.arc(42, 8, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(42, 7, 1, 2.5);
+
+      // 5. Taring Panjang Khas Macan Dahan (Long Canines)
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(46, 15);
+      ctx.lineTo(44.5, 21);
+      ctx.lineTo(47.5, 15);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawRunnerScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Tanah Hutan
+      ctx.fillStyle = '#35473b';
+      ctx.fillRect(0, 195, canvas.width, 55);
+
+      // Rumput Hijau
+      ctx.fillStyle = '#2f5b42';
+      ctx.fillRect(0, 190, canvas.width, 6);
+
+      const now = performance.now();
+      if (now < shieldUntil) {
+        ctx.save();
+        ctx.globalAlpha = 0.65 + Math.sin(animFrame * 0.18) * 0.2;
+        ctx.strokeStyle = '#72918a';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.ellipse(runnerX + 24, runnerY + 18, 39, 27, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Render Karakter 2D Macan Dahan
+      if (now < invulnerableUntil && Math.floor(now / 90) % 2 === 0) ctx.globalAlpha = 0.35;
+      drawMacanDahan2D(ctx, runnerX, runnerY, false, false, animFrame, gameOverProgress);
+      ctx.globalAlpha = 1;
+
+      if (obstacleType === 'hornbill') {
+        drawHornbill(ctx, obstacleX, 163, animFrame);
+      } else if (obstacleType === 'vine') {
+        ctx.strokeStyle = '#71895b';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(obstacleX, 188);
+        ctx.bezierCurveTo(obstacleX + 12, 166, obstacleX + 23, 197, obstacleX + 40, 174);
+        ctx.stroke();
+      } else if (obstacleType === 'boar') {
+        drawWildBoar(ctx, obstacleX, 158, animFrame);
+      } else if (obstacleType === 'snake') {
+        drawForestSnake(ctx, obstacleX, 181, animFrame);
+      } else {
+        if (obstacleType === 'log') {
+          ctx.fillStyle = '#854d0e';
+          ctx.fillRect(obstacleX, 168, 30, 24);
+          ctx.fillStyle = '#a16207';
+          ctx.fillRect(obstacleX + 3, 165, 24, 5);
+          ctx.fillStyle = '#5b3418';
+          ctx.beginPath();
+          ctx.arc(obstacleX + 30, 180, 8, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (obstacleType === 'rock') {
+          ctx.fillStyle = '#68736b';
+          ctx.beginPath();
+          ctx.moveTo(obstacleX, 191);
+          ctx.lineTo(obstacleX + 5, 174);
+          ctx.lineTo(obstacleX + 18, 166);
+          ctx.lineTo(obstacleX + 33, 176);
+          ctx.lineTo(obstacleX + 38, 191);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.fillStyle = '#456b2e';
+          for (let thorn = 0; thorn < 4; thorn++) {
+            ctx.beginPath();
+            ctx.moveTo(obstacleX + thorn * 9, 192);
+            ctx.lineTo(obstacleX + thorn * 9 + 5, 170 - (thorn % 2) * 5);
+            ctx.lineTo(obstacleX + thorn * 9 + 10, 192);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+
+      if (meatX > -40) drawMeatPickup(ctx, meatX, 155, animFrame);
+    }
+
+    function drawWildBoar(ctx, x, y, frame) {
+      const stride = Math.sin(frame * 0.34) * 2;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#654532';
+      ctx.beginPath();
+      ctx.ellipse(20, 18, 19, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(36, 17, 10, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#3d3028';
+      ctx.beginPath();
+      ctx.moveTo(31, 10);
+      ctx.lineTo(34, 1);
+      ctx.lineTo(39, 10);
+      ctx.fill();
+      ctx.fillStyle = '#f1f4e9';
+      ctx.beginPath();
+      ctx.moveTo(38, 21);
+      ctx.lineTo(44, 24);
+      ctx.lineTo(38, 25);
+      ctx.fill();
+      ctx.fillStyle = '#382b22';
+      ctx.fillRect(8, 26, 5, 10 + stride);
+      ctx.fillRect(27, 26, 5, 10 - stride);
+      ctx.fillStyle = '#1e211b';
+      ctx.beginPath();
+      ctx.arc(39, 14, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawForestSnake(ctx, x, y, frame) {
+      ctx.save();
+      ctx.lineWidth = 9;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#71895b';
+      ctx.beginPath();
+      ctx.moveTo(x + 2, y);
+      ctx.bezierCurveTo(x + 10, y - 10, x + 19, y + 9, x + 28, y - 2);
+      ctx.stroke();
+      ctx.fillStyle = '#4d6c48';
+      ctx.beginPath();
+      ctx.arc(x + 31, y - 3 + Math.sin(frame * 0.12) * 2, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f1f4e9';
+      ctx.beginPath();
+      ctx.arc(x + 33, y - 5, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawMeatPickup(ctx, x, y, frame) {
+      ctx.save();
+      ctx.translate(x, y + Math.sin(frame * 0.12) * 3);
+      ctx.shadowColor = 'rgba(24, 51, 39, .35)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#f1f4e9';
+      ctx.beginPath();
+      ctx.arc(7, 12, 6, 0, Math.PI * 2);
+      ctx.arc(7, 25, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c77b41';
+      ctx.beginPath();
+      ctx.moveTo(8, 9);
+      ctx.quadraticCurveTo(15, 2, 24, 8);
+      ctx.quadraticCurveTo(35, 8, 31, 18);
+      ctx.quadraticCurveTo(30, 28, 20, 27);
+      ctx.quadraticCurveTo(12, 32, 8, 23);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#f0c58f';
+      ctx.beginPath();
+      ctx.ellipse(21, 17, 7, 4, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawHornbill(ctx, x, y, frame) {
+      const wingBeat = Math.sin(frame * 0.35) * 5;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#202820';
+      ctx.beginPath();
+      ctx.ellipse(15, 11, 14, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(13, 4 + wingBeat, 8, 3, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(25, 7, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f1bd32';
+      ctx.beginPath();
+      ctx.moveTo(29, 6);
+      ctx.lineTo(41, 9);
+      ctx.lineTo(29, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(26, 5, 2, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(27, 6, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // --- 7. UNLOCK BADGES SYSTEM ---
+    function unlockBadge(idx) {
+      if (badges[idx]) return;
+      badges[idx] = true;
+      localStorage.setItem('jejak_badges', JSON.stringify(badges));
+      updateBadgeDisplay();
+    }
+
+    function updateBadgeDisplay() {
+      const count = badges.slice(0, 2).filter(Boolean).length;
+      document.getElementById('dash-badge-count').innerText = `${count} / 2 Lencana`;
+      badges.forEach((b, i) => {
+        const el = document.getElementById(`badge-${i+1}`);
+        if (el && b) el.classList.remove('opacity-40');
+      });
+    }
+
+    // --- 8. CHATBOT GEMINI AI ("PAKAR RIMBA") ---
+    let conversationHistory = [];
+
+    async function handleChatSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('chat-input');
+      const apiKey = document.getElementById('gemini-api-key').value.trim();
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendChatMessage('Siswa', text);
+      input.value = '';
+      const userMessage = { role: 'user', parts: [{ text }] };
+      const pendingHistory = [...conversationHistory, userMessage];
+      const submitButton = document.getElementById('chat-submit-button');
+      submitButton.disabled = true;
+
+      try {
+        if (apiKey) {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: 'Anda adalah Pak Rimbawan, pendamping belajar konservasi Kalimantan. Jawab dalam bahasa Indonesia, secara ramah, jelas, dan sesuai pertanyaan. Bedakan fakta dari hal yang belum banyak diteliti.' }]
+              },
+              contents: pendingHistory.slice(-10)
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || 'Layanan Gemini tidak dapat menjawab.');
+          const reply = data.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
+          if (!reply) throw new Error('Jawaban Gemini kosong.');
+          conversationHistory = [...pendingHistory, { role: 'model', parts: [{ text: reply }] }].slice(-10);
+          appendChatMessage('Pak Rimbawan', reply);
+        } else {
+          const reply = createLocalExpertReply(text);
+          conversationHistory = [...pendingHistory, { role: 'model', parts: [{ text: reply }] }].slice(-10);
+          appendChatMessage('Pak Rimbawan', reply);
+        }
+      } catch (error) {
+        const reply = `Layanan Gemini sedang tidak dapat dihubungi. Berikut jawaban dari panduan lokal:\n\n${createLocalExpertReply(text)}`;
+        conversationHistory = [...pendingHistory, { role: 'model', parts: [{ text: reply }] }].slice(-10);
+        appendChatMessage('Pak Rimbawan', reply);
+      } finally {
+        submitButton.disabled = false;
+      }
+    }
+
+    function createLocalExpertReply(text) {
+      const question = text.toLocaleLowerCase('id-ID').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const answers = [
+        {
+          match: /habitat|tinggal|hidup|hutan|sebaran|wilayah|borneo|kalimantan/,
+          text: 'Macan dahan Kalimantan hidup di hutan hujan Borneo, dari hutan dataran rendah dan rawa gambut hingga hutan perbukitan. Hutan yang tersambung penting agar satwa dapat mencari makan, berlindung, dan berpindah.'
+        },
+        {
+          match: /makan|mangsa|diet|berburu|predator/,
+          text: 'Macan dahan adalah predator penyergap. Mangsanya beragam, antara lain mamalia kecil, tupai, primata, burung, dan mamalia berkuku kecil hingga sedang. Ia mengandalkan kamuflase dan serangan mendadak.'
+        },
+        {
+          match: /ciri|fisik|bentuk|corak|awan|taring|ekor|kaki|ukuran/,
+          text: 'Ciri mudah dikenali ialah bercak besar seperti awan, tubuh kekar, kaki relatif pendek, taring atas yang panjang, dan ekor tebal hampir sepanjang badan. Ekor membantu menjaga keseimbangan ketika bergerak di dahan.'
+        },
+        {
+          match: /memanjat|pohon|arboreal|dahan|turun/,
+          text: 'Macan dahan piawai memanjat berkat cakar kuat, telapak lebar, dan ekor penyeimbang. Pergelangan kaki belakangnya sangat lentur sehingga dapat mencengkeram batang dan turun dengan kepala lebih dahulu. Ia tetap menggunakan lantai hutan, bukan hanya hidup di pohon.'
+        },
+        {
+          match: /ancaman|bahaya|punah|iucn|rentan|perburuan|jerat|deforestasi/,
+          text: 'Status konservasinya Vulnerable (Rentan). Ancaman utama meliputi hilangnya dan terpecahnya hutan, jalan atau pembukaan lahan, serta perburuan dan jerat. Koridor hutan, patroli, dan pemantauan satwa membantu mengurangi tekanan tersebut.'
+        },
+        {
+          match: /lindungi|konservasi|menjaga|membantu|solusi/,
+          text: 'Perlindungan bisa dimulai dengan menjaga hutan dan koridor penghubung, tidak membeli produk satwa liar, mendukung upaya patroli, serta melaporkan jerat atau perdagangan satwa kepada petugas konservasi. Warga dan pengelola lahan perlu bekerja bersama.'
+        },
+        {
+          match: /anak|berkembang biak|reproduksi|melahirkan|induk/,
+          text: 'Informasi perkembangbiakan macan dahan liar masih terbatas karena satwa ini sangat sulit diamati. Induk merawat anaknya, dan habitat yang luas serta tersambung membantu satwa menemukan pasangan dan tempat aman.'
+        },
+        {
+          match: /enggang|rangkong|burung/,
+          text: 'Burung enggang dan macan dahan sama-sama bergantung pada hutan Kalimantan, tetapi keduanya satwa yang berbeda. Enggang membantu menyebarkan biji dari buah yang dimakannya, sedangkan macan dahan adalah predator. Menjaga pohon besar dan hutan utuh bermanfaat bagi keduanya.'
+        },
+        {
+          match: /nama ilmiah|taksonomi|spesies|subspesies|beda|neofelis/,
+          text: 'Nama ilmiah subspesies Kalimantan adalah Neofelis diardi borneensis. Ia termasuk macan dahan Sunda (Neofelis diardi), yang berbeda dari macan dahan daratan Asia (Neofelis nebulosa).'
+        }
+      ];
+
+      if (/^(halo|hai|hi|selamat pagi|selamat siang|selamat sore|selamat malam)\b/.test(question)) {
+        return 'Halo! Senang belajar tentang hutan Kalimantan bersama kamu. Mau membahas habitat, makanan, ciri tubuh, atau cara melindungi macan dahan?';
+      }
+
+      const answer = answers.find(topic => topic.match.test(question));
+      if (answer) return answer.text;
+      return 'Macan dahan Kalimantan (Neofelis diardi borneensis) adalah kucing liar penghuni hutan Borneo yang bercorak seperti awan. Aku belum menemukan topik spesifik dari pertanyaan itu. Coba tanyakan tentang habitat, makanan, ciri tubuh, perilaku, perkembangbiakan, atau ancamannya.';
+    }
+
+    function appendChatMessage(sender, text) {
+      const box = document.getElementById('chat-box');
+      const message = document.createElement('div');
+      message.className = 'bg-sand p-3 rounded-xl max-w-lg border border-wood';
+      const label = document.createElement('p');
+      label.className = `font-bold text-xs ${sender === 'Siswa' ? 'text-amber-700' : 'text-pine'} mb-1`;
+      label.textContent = `${sender}:`;
+      const content = document.createElement('p');
+      content.className = 'whitespace-pre-line';
+      content.textContent = text;
+      message.append(label, content);
+      box.append(message);
+      prepareTextReveal(message);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    // --- 9. EDUKATOR TOOLS (PRINT LKPD & SERTIFIKAT) ---
+    function printLKPD() {
+      const area = document.getElementById('printable-area');
+      area.innerHTML = `
+        <h1 style="font-size:20px; font-weight:bold; text-align:center;">LEMBAR KERJA PESERTA DIDIK (LKPD) MUATAN LOKAL</h1>
+        <p style="text-align:center;">Materi: Konservasi Macan Dahan Kalimantan (Neofelis diardi borneensis)</p>
+        <hr style="margin: 15px 0;">
+        <p><b>Nama Anggota Kelompok:</b> ____________________________________</p>
+        <p><b>Kelas / Sekolah:</b> ____________________________________</p>
+        <br>
+        <h3>Pertanyaan Analisis:</h3>
+        <p>1. Jelaskan adaptasi morfologi Macan Dahan Kalimantan yang memungkinkannya memanjat pohon dengan sangat mahir!</p>
+        <br><br><br>
+        <p>2. Mengapa terputusnya koridor hutan menjadi ancaman serius bagi kelangsungan hidup spesies ini?</p>
+        <br><br><br>
+      `;
+      window.print();
+    }
+
+    function generateCertificate() {
+      const name = document.getElementById('cert-name').value.trim() || "Siswa Teladan";
+      const area = document.getElementById('printable-area');
+      area.innerHTML = `
+        <div style="border:10px solid #3e563e; padding:40px; text-align:center; font-family:sans-serif;">
+          <h1 style="color:#3e563e; font-size:28px;">SERTIFIKAT PEMBELAJARAN MUATAN LOKAL</h1>
+          <p>Diberikan kepada:</p>
+          <h2 style="font-size:24px; text-decoration:underline;">${name}</h2>
+          <p>Atas keberhasilan menyelesaikan Modul Edukasi & Konservasi</p>
+          <h3>"Jejak Dahan Kalimantan"</h3>
+          <br><br>
+          <p><i>Tertanda Digital: Tim Kurikulum Muatan Lokal Kalimantan</i></p>
+        </div>
+      `;
+      window.print();
+    }
+  </script>
+</body>
+</html>
